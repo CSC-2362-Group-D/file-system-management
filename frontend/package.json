@@ -7,6 +7,7 @@
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
     "ldap-authentication": "^3.0.3",
     "ldapjs": "^3.0.5",
     "react": "^18.2.0",
@@ -23,7 +24,7 @@
     "eject": "react-scripts eject",
     "start-backend": "cd ../backend && node server.js",
     "dev": "concurrently \"npm start\" \"npm run start-backend\""
-  },  
+  },
   "eslintConfig": {
     "extends": [
       "react-app",

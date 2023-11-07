@@ -11,7 +11,7 @@ function Login() {
     event.preventDefault();
     try {
       // Replace '/api/login' if your endpoint is different
-      const response = await axios.post('http://localhost:3000/api/login', { username, password });
+      const response = await axios.post('http://localhost:3001/api/login', { username, password });
       if (response.data.success) {
         localStorage.setItem('token', response.data.token);
         navigate('/dashboard'); // Redirect to the dashboard if login is successful
@@ -22,7 +22,11 @@ function Login() {
     } catch (error) {
       console.error('Login failed:', error);
       // Handle other errors (network error, server error, etc.)
-      alert('An error occurred. Please try again later.'); // Replace with a better error handling approach.
+      // In the catch block of your handleSubmit function
+    
+      //alert('An error occurred. Please try again later.'); 
+      // Replace with a better error handling approach.
+      
     }
   };
   
