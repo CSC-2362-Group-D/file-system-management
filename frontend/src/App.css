@@ -1,38 +1,38 @@
-.App {
-  text-align: center;
+/* Set up a dark theme for the body */
+body {
+  margin: 0;
+  font-family: 'Roboto', sans-serif; /* Roboto is a modern, sans-serif font */
+  background-color: #121212; /* Dark background */
+  color: #e0e0e0; /* Light text for contrast */
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Style all anchors with a cyberpunk-like neon color */
+a {
+  color: #08f; /* Bright blue, typical for techy themes */
+  text-decoration: none; /* Removes underlines from links */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Generic button styling */
+button {
+  background-color: #333; /* Dark buttons */
+  color: #e0e0e0;
+  border: none;
+  padding: 10px 20px;
+  margin: 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+button:hover {
+  background-color: #08f; /* Highlight buttons on hover */
+}
+
+/* Style the main container */
+.container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  min-height: 100vh; /* Full viewport height */
 }
