@@ -10,14 +10,22 @@ function Login() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
-      const response = await axios.post('http://localhost:3001/api/login', { username, password });
-      localStorage.setItem('token', response.data.token);
-      navigate('/dashboard');
+      // Replace '/api/login' if your endpoint is different
+      const response = await axios.post('http://localhost:3000/api/login', { username, password });
+      if (response.data.success) {
+        localStorage.setItem('token', response.data.token);
+        navigate('/dashboard'); // Redirect to the dashboard if login is successful
+      } else {
+        // Handle the case where login credentials are incorrect
+        alert('Incorrect username or password.'); // This is a simple way to show the error. Replace with a better error handling approach.
+      }
     } catch (error) {
       console.error('Login failed:', error);
-      // Handle error (show message to user, etc.)
+      // Handle other errors (network error, server error, etc.)
+      alert('An error occurred. Please try again later.'); // Replace with a better error handling approach.
     }
   };
+  
 
   return (
     <div style={styles.container}>

@@ -1,28 +1,33 @@
 const express = require('express');
-const app = express();
 const ldap = require('ldapjs');
-const cors = require('cors');
-const bodyParser = require('body-parser');
+require('dotenv').config();
 
-app.use(cors()); // Allows cross-origin requests
-app.use(bodyParser.json()); // Parses JSON body data
+const app = express();
+app.use(express.json());
 
-// LDAP authentication function (assumed to be implemented)
-const authenticateLDAP = require('./path-to-ldap-function');
+const client = ldap.createClient({
+  url: process.env.LDAP_URL
+});
 
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  authenticateLDAP(username, password, (isAuthenticated, err) => {
-    if (isAuthenticated) {
-      // Handle successful authentication
-      res.json({ success: true, token: 'YourGeneratedToken' });
+app.post('/api/login', function(req, res) {
+  const username = req.body.username;
+  const password = req.body.password;
+
+  const userDN = `cn=${username},${process.env.LDAP_BIND_DN}`; // Adjust the DN as per your LDAP directory structure
+
+  client.bind(userDN, password, (err) => {
+    if (err) {
+      // Authentication failed
+      res.status(401).send('Authentication failed');
     } else {
-      // Handle failed authentication
-      res.status(401).json({ success: false, message: 'Authentication failed', error: err });
+      // Authentication success
+      // Perform further user query if needed and then:
+      res.status(200).send({ token: 'your-generated-token' });
     }
   });
 });
 
-app.listen(3001, () => {
-  console.log('Server running on port 3001');
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
 });
