@@ -6,7 +6,7 @@ function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
-
+  const [displayError, setDisplayError] = useState(false);
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
@@ -21,6 +21,7 @@ function Login() {
       }
     } catch (error) {
       console.error('Login failed:', error);
+      setDisplayError(true);
       // Handle other errors (network error, server error, etc.)
       // In the catch block of your handleSubmit function
     
@@ -54,6 +55,7 @@ function Login() {
           />
         </label>
         <button style={styles.submitButton} type="submit">Log In</button>
+        {displayError && <h2>Inccorect Username or Password</h2>}
       </form>
     </div>
   );
@@ -99,6 +101,6 @@ const styles = {
     border: 'none',
     borderRadius: '4px',
     cursor: 'pointer',
-    transition: 'background-color 0.3s ease',
+    transition: 'background-color 0.2s ease',
   },
 };
