@@ -28,14 +28,12 @@ async function ldapAuth(username, password) {
   };
   try {
     let user = await authenticate(options);
-    console.error('Should work');
     return { success: true, user };
   } catch (error) {
     console.error('LDAP authentication error:', error);
     return { success: false, error };
   }
 }
-ldapAuth('lmoreau','password');
 
 // Login endpoint
 app.post('/api/login', async (req, res) => {
