@@ -1,7 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
+
 app.use(cors()); // For simplicity, allowing all origins
 app.use(express.json()); // To parse JSON request bodies
  
@@ -52,6 +57,47 @@ app.post('/api/login', async (req, res) => {
     // You may want to avoid sending detailed error messages in a production environment
     res.status(500).json({ success: false, message: 'Authentication failed', error: authResult.error.toString() });
   }
+});
+
+//Multer configuration for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+      cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+      cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
+
+app.post('/upload', upload.single('file'), (req, res) => {
+  console.log('Request file:', req.file.filename);
+  res.json({ filename: req.file.filename });
+});
+
+app.delete('/delete/:filename', (req, res) => {
+  const filePath = path.join(__dirname, 'uploads', req.params.filename);
+
+  fs.unlink(filePath, (err) => {
+      if (err) {
+          console.error('Error deleting file: ', err);
+          res.status(500).json({ error: 'Internal Server Error' });
+      } else {
+          res.json({ message: 'File deleted successfully' });
+      }
+  });
+});
+
+app.get('/download/:filename', (req, res) => {
+  const filePath = path.join(__dirname, 'uploads', req.params.filename);
+
+  res.download(filePath, (err) => {
+      if (err) {
+          console.error('Error downloading file:', err);
+          res.status(500).json({ error: 'Internal Server Error' });
+      }
+  });
 });
 
 // Start the server
