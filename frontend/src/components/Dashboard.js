@@ -1,6 +1,6 @@
 import React from 'react';
 import axios from 'axios';
-import { FaDownload, FaTrash } from 'react-icons/fa';
+import { FaDownload, FaTrash, FaEye } from 'react-icons/fa';
 //import { useEffect } from 'react';
 function Dashboard() {
   // Temporary data for file listings
@@ -157,10 +157,14 @@ function Dashboard() {
         </tr>
       </thead>
       <tbody>
-        {files.map((file, index) => (
+      {files.map((file, index) => (
           <tr key={index} style={styles.tableRow}>
             <td style={styles.fileName}>{file.name}</td>
             <td style={styles.iconCell}>
+            <FaEye
+              style={{ ...styles.icon, ...styles.viewIcon }}
+              onClick={() => handleFileView(file.name)}
+            />
               <FaDownload 
                 style={{ ...styles.icon, ...styles.downloadIcon }}
                 onClick={() => handleFileDownload(file.name)}
@@ -169,14 +173,13 @@ function Dashboard() {
                 style={{ ...styles.icon, ...styles.deleteIcon }}
                 onClick={() => handleFileDelete(file.name)}
               />
-              <button onClick={() => handleFileView(file.name)}>View</button>
-
+             
             </td>
           </tr>
         ))}
-      </tbody>
-    </table>
-  </div>
+        </tbody>
+      </table>
+    </div>
 );
 }
 
@@ -317,6 +320,33 @@ const styles = {
     wordBreak: 'break-word', // Ensures long text wraps
     maxHeight: '300px', // Set a max height for the content area
     overflowY: 'auto' // Add scrollbar if content is too long
-  }
-  
+  },
+  uploadSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '20px 0',
+  },
+  hiddenInput: {
+    display: 'none',
+  },
+  uploadLabel: {
+    padding: '10px 20px',
+    fontSize: '1rem',
+    color: '#121212',
+    backgroundColor: '#0ff',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
+  },
+  viewIcon: {
+    color: '#0ff',
+    cursor: 'pointer',
+    transition: 'transform 0.2s, color 0.2s',
+    '&:hover': {
+      transform: 'scale(1.1)',
+      color: '#fff',
+    },
+  },
 };
