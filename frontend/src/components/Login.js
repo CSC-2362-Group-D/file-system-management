@@ -14,6 +14,7 @@ function Login() {
       const response = await axios.post('http://localhost:3001/api/login', { username, password });
       if (response.data.success) {
         localStorage.setItem('token', response.data.token);
+        localStorage.setItem('homeDirectory', response.data.user.homeDirectory); 
         navigate('/dashboard'); // Redirect to the dashboard if login is successful
       } else {
         // Handle the case where login credentials are incorrect

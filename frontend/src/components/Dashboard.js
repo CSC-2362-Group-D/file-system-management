@@ -1,43 +1,154 @@
 import React from 'react';
-
+import axios from 'axios';
 import { FaDownload, FaTrash } from 'react-icons/fa';
-
+//import { useEffect } from 'react';
 function Dashboard() {
   // Temporary data for file listings
-  const files = [
-    { name: 'Report.pdf', link: '/downloads/report.pdf' },
-    { name: 'Invoice.docx', link: '/downloads/invoice.docx' }
-  ];
+  const [files, setFiles] = React.useState([]);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [viewingFileContent, setViewingFileContent] = React.useState('');
+
+  const [selectedFile, setSelectedFile] = React.useState(null);
+
+  const handleFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
+  };
+
+  const refreshFileList = () => {
+    axios.get('http://localhost:3001/files', {
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    })
+    .then(response => {
+      setFiles(response.data.files);
+    })
+    .catch(error => {
+      console.error('Error fetching files:', error);
+    });
+  }
 
   // Function to handle file upload, to be implemented
   const handleFileUpload = (event) => {
-    console.log(event.target.files);
-    // Process the file...
+    if (!selectedFile) {
+      alert('Please select a file to upload.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    axios.post('http://localhost:3001/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    })
+    .then(response => {
+      console.log('File uploaded successfully');
+      refreshFileList();
+      // Refresh file list or notify user
+    })
+    .catch(error => {
+      console.error('Error uploading file:', error);
+    });
   };
 
-  // Function to handle file download, to be implemented
   const handleFileDownload = (fileName) => {
-    console.log(`Downloading ${fileName}`);
-    // Process the download...
+    axios({
+      url: `http://localhost:3001/download/${fileName}`,
+      method: 'GET',
+      responseType: 'blob', // Important
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    .then(response => {
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+    })
+    .catch(error => {
+      console.error('Error downloading file:', error);
+    });
+  };
+  
+  const handleFileDelete = (fileName) => {
+    axios.delete(`http://localhost:3001/delete/${fileName}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    .then(() => {
+      console.log('File deleted successfully');
+      // Refresh file list or notify user
+      setFiles(files.filter(file => file.name !== fileName)); 
+    })
+    .catch(error => {
+      console.error('Error deleting file:', error);
+    });
   };
 
-  // Function to handle file delete, to be implemented
-  const handleFileDelete = (fileName) => {
-    console.log(`Deleting ${fileName}`);
-    // Process the deletion...
+  const handleFileView = (fileName) => {
+    axios.get(`http://localhost:3001/view/${fileName}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    .then(response => {
+      setViewingFileContent(response.data.content);
+      setIsModalOpen(true);
+    })
+    .catch(error => {
+      console.error('Error viewing file:', error);
+    });
   };
+
+  React.useEffect(() => {
+    axios.get('http://localhost:3001/files', {
+      headers: {
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      }
+    })
+    .then(response => {
+      setFiles(response.data.files); // Assuming response contains an array of file objects
+    })
+    .catch(error => {
+      console.error('Error fetching files:', error);
+    });
+  }, []);
+  
 
   return (
     <div style={styles.container}>
     <h1 style={styles.title}>File Management Dashboard</h1>
-    <h4> Upload:
-    <input 
-      type="file" 
-      
-      onChange={handleFileUpload} 
-      style={styles.uploadInput}
-      
-    /></h4>
+    {isModalOpen && (
+      <div style={styles.modal}>
+        <div style={styles.modalContent}>
+          <h2>File Content</h2>
+          <pre style={styles.fileContent}>{viewingFileContent}</pre>
+          <button onClick={() => setIsModalOpen(false)}>Close</button>
+        </div>
+      </div>
+    )}
+
+    <div>
+      <input 
+        type="file" 
+        onChange={handleFileChange} 
+        style={styles.uploadInput}
+      />
+      <button 
+        onClick={handleFileUpload} 
+        style={styles.submitButton}
+      >
+        Upload File
+      </button>
+    </div>
     <table style={styles.table}>
       <thead>
         <tr>
@@ -58,6 +169,8 @@ function Dashboard() {
                 style={{ ...styles.icon, ...styles.deleteIcon }}
                 onClick={() => handleFileDelete(file.name)}
               />
+              <button onClick={() => handleFileView(file.name)}>View</button>
+
             </td>
           </tr>
         ))}
@@ -180,4 +293,30 @@ const styles = {
     color: '#0ff', // Style color for delete icon
     // More styles specific to the delete icon
   },
+  modal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#333',
+    padding: '20px',
+    borderRadius: '5px',
+    maxWidth: '500px',
+    maxHeight: '80%',
+    overflowY: 'auto'
+  },
+  fileContent: {
+    whiteSpace: 'pre-wrap', // Keeps the formatting of the text
+    wordBreak: 'break-word', // Ensures long text wraps
+    maxHeight: '300px', // Set a max height for the content area
+    overflowY: 'auto' // Add scrollbar if content is too long
+  }
+  
 };
