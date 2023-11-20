@@ -1,18 +1,36 @@
 import React from 'react';
 import axios from 'axios';
-import { FaDownload, FaTrash, FaEye } from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
+import { FaDownload, FaTrash, FaEye, FaSignOutAlt  } from 'react-icons/fa';
 //import { useEffect } from 'react';
 function Dashboard() {
   // Temporary data for file listings
   const [files, setFiles] = React.useState([]);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [viewingFileContent, setViewingFileContent] = React.useState('');
-
+  const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = React.useState(null);
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
+
+  const handleLogout = async () => {
+    try {
+      await axios.post('http://localhost:3001/api/logout', {}, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      console.log('Logged out successfully');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
+    
+    localStorage.removeItem('token'); // Clear the token
+    navigate('/'); // Redirect to login
+  };
+  
 
   const refreshFileList = () => {
     axios.get('http://localhost:3001/files', {
@@ -124,8 +142,18 @@ function Dashboard() {
   
 
   return (
+    <div style={styles.screen}><div style={styles.header}>
+    <button 
+      onClick={handleLogout} 
+      style={{ ...styles.submitButton, ...styles.logoutButton }}
+    >
+      <FaSignOutAlt /> Logout
+    </button>
+    </div>
     <div style={styles.container}>
-    <h1 style={styles.title}>File Management Dashboard</h1>
+      
+        <h1 style={styles.title}>File Management Dashboard</h1>
+   
     {isModalOpen && (
       <div style={styles.modal}>
         <div style={styles.modalContent}>
@@ -180,6 +208,7 @@ function Dashboard() {
         </tbody>
       </table>
     </div>
+    </div>
 );
 }
 
@@ -188,15 +217,22 @@ export default Dashboard;
 // You can continue to use the styles object from your Login component
 // and just add/adjust styles specific to the Dashboard.
 const styles = {
-  // ... (reuse styles from your Login component here)
+  screen: {
+      minHeight: '100vh',
+      backgroundColor: '#121212', // Dark background color
+      color: '#0ff', // Bright cyber color for text
+ 
+  },
   container: {
-    minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#121212', // Dark background color
-    color: '#0ff', // Bright cyber color for text
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    padding: 13,
   },
   title: {
     marginBottom: '2rem',
@@ -227,6 +263,12 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     transition: 'background-color 0.2s ease',
+  },
+  logoutButton: {
+    fontSize: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px', // Space between icon and text
   },
   uploadInput: {
     margin: '0px 10px',

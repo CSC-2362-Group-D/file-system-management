@@ -70,7 +70,12 @@ const audit = (action, filename, user) => {
   }
 
   // Append audit message to the record.txt file
-  const auditMessage = `${timestamp} - ${action} by ${user.uid} on file ${filename}\n`;
+  let auditmessage;
+  if (filename == null) {
+    auditMessage = `${timestamp} - ${action} by ${user.uid}\n`;
+  } else {
+    auditMessage = `${timestamp} - ${action} by ${user.uid} on file ${filename}\n`;
+  }
   fs.appendFileSync(auditFilePath, auditMessage);
 };
 
@@ -83,7 +88,7 @@ const auditMiddleware = (action) => {
   };
 };
 
-// Login endpoint
+// Login endpoint with auditing
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -120,6 +125,7 @@ app.post("/api/login", async (req, res) => {
           flag: "wx",
         });
       }
+
       // Generate JWT token
       const token = jwt.sign(
         {
@@ -130,6 +136,10 @@ app.post("/api/login", async (req, res) => {
         process.env.JWT_SECRET,
         { expiresIn: "1h" }
       );
+
+      // Auditing for login
+      const loginAction = "login";
+      audit(loginAction, null, authResult.user);
 
       res.status(200).json({
         success: true,
@@ -142,6 +152,10 @@ app.post("/api/login", async (req, res) => {
       res.status(500).json({ error: "Internal Server Error" });
     }
   } else {
+    // Auditing for failed login
+    const loginAction = "failed login";
+    audit(loginAction, null, { uid: username });
+
     // You may want to avoid sending detailed error messages in a production environment
     res.status(500).json({
       success: false,
@@ -222,19 +236,34 @@ app.get("/download/:filename", auditMiddleware("download"), (req, res) => {
 });
 
 // Endpoint to get file content
-app.get("/view/:filename", jwtMiddleware, async (req, res) => {
-  const { filename } = req.params;
-  const homeDir = req.user.homeDirectory;
+app.get(
+  "/view/:filename",
+  jwtMiddleware,
+  auditMiddleware("view"),
+  async (req, res) => {
+    const { filename } = req.params;
+    const homeDir = req.user.homeDirectory;
 
-  const filePath = path.join(homeDir, "uploads", filename);
+    const filePath = path.join(homeDir, "uploads", filename);
 
-  try {
-    const content = fs.readFileSync(filePath, "utf8");
-    res.json({ content });
-  } catch (error) {
-    console.error("Error reading file:", error);
-    res.status(500).json({ error: "Error reading file" });
+    try {
+      const content = fs.readFileSync(filePath, "utf8");
+      res.json({ content });
+    } catch (error) {
+      console.error("Error reading file:", error);
+      res.status(500).json({ error: "Error reading file" });
+    }
   }
+);
+// Add this endpoint to your server.js
+
+app.post("/api/logout", jwtMiddleware, (req, res) => {
+  // Auditing for logout
+  const logoutAction = "logout";
+  audit(logoutAction, null, req.user);
+
+  // You can add logic here to invalidate the token if needed
+  res.json({ message: "Logged out successfully" });
 });
 
 // Start the server
