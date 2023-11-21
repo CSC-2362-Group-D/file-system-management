@@ -255,7 +255,6 @@ app.get(
     }
   }
 );
-// Add this endpoint to your server.js
 
 app.post("/api/logout", jwtMiddleware, (req, res) => {
   // Auditing for logout
@@ -265,6 +264,7 @@ app.post("/api/logout", jwtMiddleware, (req, res) => {
   // You can add logic here to invalidate the token if needed
   res.json({ message: "Logged out successfully" });
 });
+
 
 // Start the server
 app.listen(PORT, () => {
