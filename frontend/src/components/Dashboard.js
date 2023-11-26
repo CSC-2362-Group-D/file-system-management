@@ -17,7 +17,7 @@ function Dashboard() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:3001/api/logout', {}, {
+      await axios.post('https://localhost:3001/api/logout', {}, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -33,7 +33,7 @@ function Dashboard() {
   
 
   const refreshFileList = () => {
-    axios.get('http://localhost:3001/files', {
+    axios.get('https://localhost:3001/files', {
       headers: {
         'Authorization': 'Bearer ' + localStorage.getItem('token')
       }
@@ -56,7 +56,7 @@ function Dashboard() {
     const formData = new FormData();
     formData.append('file', selectedFile);
 
-    axios.post('http://localhost:3001/upload', formData, {
+    axios.post('https://localhost:3001/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         'Authorization': 'Bearer ' + localStorage.getItem('token')
@@ -74,7 +74,7 @@ function Dashboard() {
 
   const handleFileDownload = (fileName) => {
     axios({
-      url: `http://localhost:3001/download/${fileName}`,
+      url: `https://localhost:3001/download/${fileName}`,
       method: 'GET',
       responseType: 'blob', // Important
       headers: {
@@ -96,7 +96,7 @@ function Dashboard() {
   };
   
   const handleFileDelete = (fileName) => {
-    axios.delete(`http://localhost:3001/delete/${fileName}`, {
+    axios.delete(`https://localhost:3001/delete/${fileName}`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
@@ -112,7 +112,7 @@ function Dashboard() {
   };
 
   const handleFileView = (fileName) => {
-    axios.get(`http://localhost:3001/view/${fileName}`, {
+    axios.get(`https://localhost:3001/view/${fileName}`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
@@ -127,7 +127,7 @@ function Dashboard() {
   };
 
   React.useEffect(() => {
-    axios.get('http://localhost:3001/files', {
+    axios.get('https://localhost:3001/files', {
       headers: {
         'Authorization': 'Bearer ' + localStorage.getItem('token')
       }

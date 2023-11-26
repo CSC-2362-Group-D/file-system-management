@@ -1,14 +1,30 @@
 const express = require("express");
+const https = require("https");
+const fs = require("fs"); // Only one fs require is necessary
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
 const { mkdirp } = require("mkdirp");
 const jwt = require("jsonwebtoken");
 const { authenticate } = require("ldap-authentication");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const key = fs.readFileSync('./localhost-key.pem', 'utf8');
+const cert = fs.readFileSync('./localhost.pem', 'utf8');
+
+// // Specify the path to your certificate and private key
+// const privateKey = fs.readFileSync('./localhost.key', 'utf8'); // Update the path as necessary
+// const certificate = fs.readFileSync('./localhost.crt', 'utf8'); // Update the path as necessary
+// const credentials = { key: privateKey, cert: certificate };
+
+// // Create and start HTTPS server
+// const httpsServer = https.createServer(credentials, app);
+// httpsServer.listen(PORT, () => {
+//   console.log(`HTTPS Server listening on port ${PORT}`);
+// });
+https.createServer({ key, cert }, app).listen(3001);
+
 app.use(cors()); // For simplicity, allowing all origins
 app.use(express.json()); // To parse JSON request bodies
 
@@ -29,6 +45,7 @@ async function ldapAuth(username, password) {
     usernameAttribute: "uid", // The attribute against which the username will be matched
     username, // The actual username
     userPassword: password, // The actual password
+    
   };
   try {
     let user = await authenticate(options);
@@ -266,7 +283,7 @@ app.post("/api/logout", jwtMiddleware, (req, res) => {
 });
 
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
-});
+// // Start the server
+// app.listen(PORT, () => {
+//   console.log(`Server listening on port ${PORT}`);
+// });

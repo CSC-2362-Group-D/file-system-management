@@ -11,7 +11,7 @@ function Login() {
     event.preventDefault();
     try {
       // Replace '/api/login' if your endpoint is different
-      const response = await axios.post('http://localhost:3001/api/login', { username, password });
+      const response = await axios.post('https://localhost:3001/api/login', { username, password });
       if (response.data.success) {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('homeDirectory', response.data.user.homeDirectory); 
