@@ -8,6 +8,13 @@ const { mkdirp } = require("mkdirp");
 const jwt = require("jsonwebtoken");
 const { authenticate } = require("ldap-authentication");
 
+//const winston = require('winston'); (delete line if not using winston for logging)
+//const logger = winston.createLogger({
+  //transports: [
+    //new winston.transports.File({ filename: 'audit.log' }),
+  //],
+//});
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const key = fs.readFileSync('./localhost-key.pem', 'utf8');
@@ -67,7 +74,7 @@ const jwtMiddleware = (req, res, next) => {
 };
 
 // Function to append audit messages to a file
-const audit = (action, filename, user) => {
+const audit = (action, filename, user/*,ipAddress*/) => {
   const auditDir = path.join(__dirname, "audit");
   const auditFilePath = path.join(auditDir, "record.txt");
   const timestamp = new Date().toISOString();
@@ -85,13 +92,15 @@ const audit = (action, filename, user) => {
     auditMessage = `${timestamp} - ${action} by ${user.uid} on file ${filename}\n`;
   }
   fs.appendFileSync(auditFilePath, auditMessage);
+//logger.info(auditMessage);
 };
 
 // Middleware to handle auditing for file uplaods, downloads, and deletions
 const auditMiddleware = (action) => {
   return (req, res, next) => {
     const filename = req.params.filename || (req.file && req.file.filename);
-    audit(action, filename, req.user);
+    //const ipAddress = req.ip || req.connection.remoteAddress;
+    audit(action, filename, req.user/*, ipAddress */);
     next();
   };
 };
