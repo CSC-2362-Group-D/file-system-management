@@ -13,16 +13,7 @@ const PORT = process.env.PORT || 3001;
 const key = fs.readFileSync('./localhost-key.pem', 'utf8');
 const cert = fs.readFileSync('./localhost.pem', 'utf8');
 
-// // Specify the path to your certificate and private key
-// const privateKey = fs.readFileSync('./localhost.key', 'utf8'); // Update the path as necessary
-// const certificate = fs.readFileSync('./localhost.crt', 'utf8'); // Update the path as necessary
-// const credentials = { key: privateKey, cert: certificate };
 
-// // Create and start HTTPS server
-// const httpsServer = https.createServer(credentials, app);
-// httpsServer.listen(PORT, () => {
-//   console.log(`HTTPS Server listening on port ${PORT}`);
-// });
 https.createServer({ key, cert }, app).listen(3001);
 
 app.use(cors()); // For simplicity, allowing all origins
@@ -104,6 +95,29 @@ const auditMiddleware = (action) => {
     next();
   };
 };
+const SHARED_DIR = path.join(__dirname, 'shared');
+
+async function checkAndPopulateSharedDir() {
+  // Check if shared directory exists, create if not
+  if (!fs.existsSync(SHARED_DIR)) {
+    await mkdirp(SHARED_DIR);
+  }
+
+  // Check if the directory is empty
+  const files = await fs.promises.readdir(SHARED_DIR);
+  if (files.length === 0) {
+    // ASCII art of a tiger
+    const asciiArtTiger = `
+     /\_/\  
+    ( o.o ) 
+     > ^ <
+    `;
+    const welcomeFilePath = path.join(SHARED_DIR, "tiger.txt");
+    // Create a file with ASCII art
+    await fs.promises.writeFile(welcomeFilePath, asciiArtTiger);
+  }
+}
+
 
 // Login endpoint with auditing
 app.post("/api/login", async (req, res) => {
@@ -142,13 +156,14 @@ app.post("/api/login", async (req, res) => {
           flag: "wx",
         });
       }
-
+      const roles = authResult.user.title; 
       // Generate JWT token
       const token = jwt.sign(
         {
           dn: authResult.user.dn,
           homeDirectory: userHomeDir,
           uid: uid,
+          roles: roles,
         },
         process.env.JWT_SECRET,
         { expiresIn: "1h" }
@@ -192,6 +207,18 @@ const storage = multer.diskStorage({
   },
 });
 
+const checkRole = (requiredRole) => {
+  return (req, res, next) => {
+    const user = req.user;
+    if (user && user.roles.includes(requiredRole)) {
+      next();
+    } else {
+      res.status(403).json({ message: "Access denied" });
+    }
+  };
+};
+
+
 //console.log(storage);
 const upload = multer({ storage });
 
@@ -200,35 +227,69 @@ app.use("/files", jwtMiddleware);
 app.use("/delete/:filename", jwtMiddleware);
 app.use("/download/:filename", jwtMiddleware);
 
-app.post(
-  "/upload",
-  upload.single("file"),
-  auditMiddleware("upload"),
-  (req, res) => {
-    res.json({
-      message: "File uploaded successfully",
-      filename: req.file.filename,
-    });
+app.post("/upload", upload.single("file"), jwtMiddleware, (req, res) => {
+  const isShared = req.body.isShared === 'true';
+  let destinationPath;
+
+  if (isShared) {
+    if (!req.user.roles.includes('upload')) {
+      return res.status(403).json({ message: "Access denied" });
+    }
+    destinationPath = SHARED_DIR;
+  } else {
+    destinationPath = path.join(__dirname, "/home/", req.user.uid, "uploads");
   }
-);
 
-app.get("/files", async (req, res) => {
+  const newFilePath = path.join(destinationPath, req.file.filename);
+  fs.rename(req.file.path, newFilePath, (err) => {
+    if (err) {
+      console.error("Error moving file:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+    auditMiddleware('upload')(req, res, () => {
+      res.json({
+        message: "File uploaded successfully",
+        filename: req.file.filename,
+      });
+    });
+  });
+});
+
+
+
+
+// Endpoint to get personal files
+app.get("/files/personal", jwtMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization.split(" ")[1];
-    const user = jwt.verify(token, process.env.JWT_SECRET);
-    const userHomeDir = path.join(__dirname, "/home/", user.uid, "uploads");
+    const userHomeDir = path.join(__dirname, "/home/", req.user.uid, "uploads");
+    if (!fs.existsSync(userHomeDir)) {
+      await mkdirp(userHomeDir);
+    }
 
-    const files = await fs.promises.readdir(userHomeDir);
-    const fileDetails = files.map((filename) => ({ name: filename }));
-
+    let files = await fs.promises.readdir(userHomeDir);
+    const fileDetails = files.map(filename => ({ name: filename }));
     res.json({ files: fileDetails });
   } catch (error) {
-    console.error("Error listing files:", error);
-    res.status(500).json({ error: "Error listing files" });
+    console.error("Error listing personal files:", error);
+    res.status(500).json({ error: "Error listing personal files" });
   }
 });
 
-app.delete("/delete/:filename", auditMiddleware("delete"), (req, res) => {
+// Endpoint to get shared files
+app.get("/files/shared", jwtMiddleware, async (req, res) => {
+  try {
+    await checkAndPopulateSharedDir();
+    let files = await fs.promises.readdir(SHARED_DIR);
+    const fileDetails = files.map(filename => ({ name: filename }));
+    res.json({ files: fileDetails });
+  } catch (error) {
+    console.error("Error listing shared files:", error);
+    res.status(500).json({ error: "Error listing shared files" });
+  }
+});
+
+
+app.delete("/delete/:filename", checkRole('delete'), auditMiddleware("delete"), (req, res) => {
   const homeDir = req.user.homeDirectory; // Extract from user's session or token
   const filePath = path.join(homeDir, "uploads", req.params.filename);
   fs.unlink(filePath, (err) => {
@@ -241,7 +302,7 @@ app.delete("/delete/:filename", auditMiddleware("delete"), (req, res) => {
   });
 });
 
-app.get("/download/:filename", auditMiddleware("download"), (req, res) => {
+app.get("/download/:filename", checkRole('download'), auditMiddleware("download"), (req, res) => {
   const homeDir = req.user.homeDirectory; // Extract from user's session or token
   const filePath = path.join(homeDir, "uploads", req.params.filename);
   res.download(filePath, (err) => {
@@ -253,25 +314,20 @@ app.get("/download/:filename", auditMiddleware("download"), (req, res) => {
 });
 
 // Endpoint to get file content
-app.get(
-  "/view/:filename",
-  jwtMiddleware,
-  auditMiddleware("view"),
-  async (req, res) => {
-    const { filename } = req.params;
-    const homeDir = req.user.homeDirectory;
+app.get("/view/:filename", checkRole('view'), auditMiddleware("view"), async (req, res) => {
+  const { filename } = req.params;
+  const fileDir = activeTab === 'personal' ? req.user.homeDirectory : SHARED_DIR;
+  const filePath = path.join(fileDir, "uploads", filename);
 
-    const filePath = path.join(homeDir, "uploads", filename);
-
-    try {
-      const content = fs.readFileSync(filePath, "utf8");
-      res.json({ content });
-    } catch (error) {
-      console.error("Error reading file:", error);
-      res.status(500).json({ error: "Error reading file" });
-    }
+  try {
+    const content = fs.readFileSync(filePath, "utf8");
+    res.json({ content });
+  } catch (error) {
+    console.error("Error reading file:", error);
+    res.status(500).json({ error: "Error reading file" });
   }
-);
+});
+
 
 app.post("/api/logout", jwtMiddleware, (req, res) => {
   // Auditing for logout

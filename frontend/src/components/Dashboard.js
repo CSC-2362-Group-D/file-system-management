@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+//import jwtDecode from 'jwt-decode';
+import { jwtDecode } from "jwt-decode";
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { FaDownload, FaTrash, FaEye, FaSignOutAlt  } from 'react-icons/fa';
 //import { useEffect } from 'react';
+import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
+import 'react-tabs/style/react-tabs.css';
 function Dashboard() {
   // Temporary data for file listings
   const [files, setFiles] = React.useState([]);
@@ -10,11 +14,22 @@ function Dashboard() {
   const [viewingFileContent, setViewingFileContent] = React.useState('');
   const navigate = useNavigate();
   const [selectedFile, setSelectedFile] = React.useState(null);
-
+  const [userRoles, setUserRoles] = useState([]);
+  const [activeTab, setActiveTab] = useState('personal'); // 'personal' or 'shared'
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [tabIndex, setTabIndex] = useState(0);
+  useEffect(() => { 
+    const token = localStorage.getItem('token');
+    if (token) {
+      const decodedToken = jwtDecode(token);
+      setUserRoles(decodedToken.roles || []);
+    }
+  }, []);
+  
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
   };
-
+  
   const handleLogout = async () => {
     try {
       await axios.post('https://localhost:3001/api/logout', {}, {
@@ -33,18 +48,28 @@ function Dashboard() {
   
 
   const refreshFileList = () => {
-    axios.get('https://localhost:3001/files', {
-      headers: {
-        'Authorization': 'Bearer ' + localStorage.getItem('token')
-      }
+    const endpoint = tabIndex == 0 ? 'https://localhost:3001/files/personal' : 'https://localhost:3001/files/shared';
+    axios.get(endpoint, {
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
     })
     .then(response => {
-      setFiles(response.data.files);
+      if (tabIndex == 0) {
+        setFiles(response.data.files);
+      } else {
+        setSharedFiles(response.data.files);
+      }
     })
     .catch(error => {
-      console.error('Error fetching files:', error);
+      console.error(`Error fetching ${activeTab} files:`, error);
     });
-  }
+}
+
+
+React.useEffect(() => {
+  refreshFileList();
+}, [tabIndex]);
+
+  
 
   // Function to handle file upload, to be implemented
   const handleFileUpload = (event) => {
@@ -55,11 +80,12 @@ function Dashboard() {
 
     const formData = new FormData();
     formData.append('file', selectedFile);
-
+    formData.append('isShared', tabIndex === 1); // true for shared, false for personal
+  
     axios.post('https://localhost:3001/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
-        'Authorization': 'Bearer ' + localStorage.getItem('token')
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
     })
     .then(response => {
@@ -163,20 +189,26 @@ function Dashboard() {
         </div>
       </div>
     )}
-
+    
     <div>
-      <input 
-        type="file" 
-        onChange={handleFileChange} 
-        style={styles.uploadInput}
-      />
-      <button 
-        onClick={handleFileUpload} 
-        style={styles.submitButton}
-      >
-        Upload File
-      </button>
-    </div>
+        {/* Conditional upload button based on active tab and user role */}
+        {tabIndex === 0  && (
+          <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
+        )}
+        {tabIndex === 1  && userRoles.includes('upload') && (
+          <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
+        )}
+        <button onClick={handleFileUpload} style={styles.submitButton}>Upload File</button>
+      </div>
+
+    <Tabs style={styles.tabBar} selectedIndex={tabIndex} onSelect={index => setTabIndex(index)}>
+        <TabList>
+          <Tab style={tabIndex === 0 ? styles.activeTab : styles.tab}>Personal Files</Tab>
+          <Tab style={tabIndex === 1 ? styles.activeTab : styles.tab}>Shared Files</Tab>
+        </TabList>
+
+        <TabPanel>
+
     <table style={styles.table}>
       <thead>
         <tr>
@@ -185,7 +217,7 @@ function Dashboard() {
         </tr>
       </thead>
       <tbody>
-      {files.map((file, index) => (
+      {(files).map((file, index) => (
           <tr key={index} style={styles.tableRow}>
             <td style={styles.fileName}>{file.name}</td>
             <td style={styles.iconCell}>
@@ -207,15 +239,51 @@ function Dashboard() {
         ))}
         </tbody>
       </table>
+  
+    </TabPanel>
+    <TabPanel>
+
+    <table style={styles.table}>
+      <thead>
+        <tr>
+          <th style={styles.fileNameHeader}>File Name</th>
+          <th style={styles.iconHeader}>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {(sharedFiles).map((file, index) => (
+          <tr key={index} style={styles.tableRow}>
+            <td style={styles.fileName}>{file.name}</td>
+            <td style={styles.iconCell}>
+            <FaEye
+              style={{ ...styles.icon, ...styles.viewIcon }}
+              onClick={() => handleFileView(file.name)}
+            />
+              {userRoles.includes('download') && (
+              <FaDownload 
+                style={{ ...styles.icon, ...styles.downloadIcon }}
+                onClick={() => handleFileDownload(file.name)}
+              />)}
+                {userRoles.includes('delete') && (
+              <FaTrash 
+                style={{ ...styles.icon, ...styles.deleteIcon }}
+                onClick={() => handleFileDelete(file.name)}
+              />)}
+             
+            </td>
+          </tr>
+        ))}
+        </tbody>
+      </table>
+  
+    </TabPanel>
+      </Tabs>
+      </div>
     </div>
-    </div>
+    
 );
 }
-
-export default Dashboard;
-
-// You can continue to use the styles object from your Login component
-// and just add/adjust styles specific to the Dashboard.
+ 
 const styles = {
   screen: {
       minHeight: '100vh',
@@ -254,16 +322,22 @@ const styles = {
     borderRadius: '4px',
     width: '250px', // Fixed width, could be responsive
   },
-  submitButton: {
-    padding: '10px 20px',
-    fontSize: '1rem',
-    color: '#121212', // Dark text for contrast
-    backgroundColor: '#0ff', // Bright cyber color for buttons
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s ease',
-  },
+  // Button Styles
+submitButton: {
+  padding: '10px 20px',
+  fontSize: '1rem',
+  color: '#121212',
+  backgroundColor: '#0ff',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
+  transition: 'background-color 0.2s ease, transform 0.2s ease',
+  '&:hover': {
+    backgroundColor: '#0dd', // Change the color on hover
+    transform: 'scale(1.05)' // Slightly increase the size on hover
+  }
+},
+
   logoutButton: {
     fontSize: '1rem',
     display: 'flex',
@@ -281,7 +355,7 @@ const styles = {
     cursor: 'pointer'
   },
   table: {
-    width: '80%',
+    width: '100%',
     marginTop: '20px',
     alignItems: 'center',
     borderCollapse: 'collapse',
@@ -391,4 +465,24 @@ const styles = {
       color: '#fff',
     },
   },
+  tabBar: {
+    padding: '20px',
+    width:'80%',
+    flex:1,    
+  },tab: {
+    color: '#0ff',
+    width: '46%',
+    border: 'none',
+    padding: '10px',
+    cursor: 'pointer',
+    backgroundColor: 'transparent',
+  },
+  activeTab: {
+    color: 'black',
+    width: '46%',
+    border: 'none',
+    backgroundColor: '#0ff',
+  }
 };
+
+export default Dashboard;
