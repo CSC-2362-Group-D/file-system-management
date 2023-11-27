@@ -8,6 +8,9 @@ const { mkdirp } = require("mkdirp");
 const jwt = require("jsonwebtoken");
 const { authenticate } = require("ldap-authentication");
 
+const MAX_FAILED_ATTEMPTS = 3; // Adjust as needed
+const LOCKOUT_DURATION = 5 * 60 * 1000;
+
 //const winston = require('winston'); (delete line if not using winston for logging)
 //const logger = winston.createLogger({
   //transports: [
@@ -47,9 +50,52 @@ async function ldapAuth(username, password) {
   };
   try {
     let user = await authenticate(options);
+
+    // Check if user is locked out
+    if (user.isLocked) {
+      // User is locked out
+      const lockoutEndDate = new Date(user.lockoutEndDate);
+      if (lockoutEndDate > new Date()) {
+        // User is still locked out
+        return {
+          success: false,
+          error: "User is locked out. Please try again later.",
+        };
+      } else {
+        // User lockout period has expired, reset login attempts
+        await User.findByIdAndUpdate(user._id, {
+          failedLoginAttempts: 0,
+          isLocked: false,
+        });
+      }
+    }
+
     return { success: true, user };
   } catch (error) {
     console.error("LDAP authentication error:", error);
+
+    // Handle failed login attempts
+    const updatedUser = await handleFailedLogin(username);
+
+    // Check if max failed attempts reached
+    if (updatedUser.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+      // Lock the user account
+      const lockoutEndDate = new Date(Date.now() + LOCKOUT_DURATION);
+
+      await User.findByIdAndUpdate(updatedUser._id, {
+        isLocked: true,
+        lockoutEndDate,
+      });
+
+      const loginAction = "failed login";
+      audit(loginAction, null, { uid: username });
+
+      return {
+        success: false,
+        error: "User is locked out. Please try again later.",
+      };
+    }
+
     return { success: false, error };
   }
 }
@@ -138,9 +184,16 @@ app.post("/api/login", async (req, res) => {
       .json({ success: false, message: "Username and password are required." });
   }
 
+  const user = await User.findOne({ username });
+
+  if (user && user.isLocked) {
+    return res.status(403).json({ success: false, message: "Account is locked. Please contact support." });
+  }
+
   const authResult = await ldapAuth(username, password);
 
   if (authResult.success) {
+    await User.findOneAndUpdate({ username }, { failedLoginAttempts: 0 });
     const uid = authResult.user.uid;
     if (!uid) {
       return res.status(500).json({ error: "User UID is undefined" });
@@ -194,6 +247,13 @@ app.post("/api/login", async (req, res) => {
     }
   } else {
     // Auditing for failed login
+    
+    const updatedUser = await handleFailedLogin(username);
+
+    if (updatedUser.failedLoginAttempts >= MAX_FAILED_ATTEMPTS) {
+      // Lock the user account
+      await User.findByIdAndUpdate(updatedUser._id, { isLocked: true });
+    }
     const loginAction = "failed login";
     audit(loginAction, null, { uid: username });
 
@@ -204,8 +264,23 @@ app.post("/api/login", async (req, res) => {
       error: authResult.error.toString(),
     });
   }
-});
-
+  
+  const handleFailedLogin = async (username) => {
+    try {
+      const user = await User.findOneAndUpdate(
+        { username },
+        {
+          $inc: { failedLoginAttempts: 1 },
+          $set: { lastFailedLogin: new Date() },
+        },
+        { new: true }
+      );
+  
+      return user;
+    } catch (error) {
+      console.error('Error updating failed login attempts:', error);
+    }
+  };
 // Modify multer storage configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -227,6 +302,13 @@ const checkRole = (requiredRole) => {
   };
 };
 
+const userSchema = new mongoose.Schema({
+  failedLoginAttempts: { type: Number, default: 0 },
+  lastFailedLogin: { type: Date },
+  isLocked: { type: Boolean, default: false },
+});
+
+const User = mongoose.model('User', userSchema);
 
 //console.log(storage);
 const upload = multer({ storage });
@@ -351,4 +433,4 @@ app.post("/api/logout", jwtMiddleware, (req, res) => {
 // // Start the server
 // app.listen(PORT, () => {
 //   console.log(`Server listening on port ${PORT}`);
-// });
+});
