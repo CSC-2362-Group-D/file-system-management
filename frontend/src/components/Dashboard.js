@@ -81,7 +81,7 @@ React.useEffect(() => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('isShared', tabIndex === 1); // true for shared, false for personal
-  
+    
     axios.post('https://localhost:3001/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -180,35 +180,33 @@ React.useEffect(() => {
       
         <h1 style={styles.title}>File Management Dashboard</h1>
    
-    {isModalOpen && (
-      <div style={styles.modal}>
-        <div style={styles.modalContent}>
-          <h2>File Content</h2>
-          <pre style={styles.fileContent}>{viewingFileContent}</pre>
-          <button onClick={() => setIsModalOpen(false)}>Close</button>
-        </div>
-      </div>
-    )}
-    
-    <div>
-        {/* Conditional upload button based on active tab and user role */}
-        {tabIndex === 0  && (
-          <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
+        {isModalOpen && (
+          <div style={styles.modal}>
+            <div style={styles.modalContent}>
+              <h2>File Content</h2>
+              <pre style={styles.fileContent}>{viewingFileContent}</pre>
+              <button onClick={() => setIsModalOpen(false)}>Close</button>
+            </div>
+          </div>
         )}
-        {tabIndex === 1  && userRoles.includes('upload') && (
-          <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
-        )}
-        <button onClick={handleFileUpload} style={styles.submitButton}>Upload File</button>
-      </div>
+
+        
+     
 
     <Tabs style={styles.tabBar} selectedIndex={tabIndex} onSelect={index => setTabIndex(index)}>
         <TabList>
           <Tab style={tabIndex === 0 ? styles.activeTab : styles.tab}>Personal Files</Tab>
-          <Tab style={tabIndex === 1 ? styles.activeTab : styles.tab}>Shared Files</Tab>
+          {(userRoles.includes('view') && <Tab style={tabIndex === 1 ? styles.activeTab : styles.tab}>Shared Files</Tab>)}
         </TabList>
 
         <TabPanel>
-
+       
+        {(tabIndex === 1  && userRoles.includes('upload')) || (tabIndex === 0) && (
+          <div style={styles.fileUploadBar}>
+          <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
+          <button onClick={handleFileUpload} style={styles.submitButton}>Upload File</button>
+          </div>
+        )}
     <table style={styles.table}>
       <thead>
         <tr>
@@ -293,6 +291,13 @@ const styles = {
       backgroundColor: '#121212', // Dark background color
       color: '#0ff', // Bright cyber color for text
  
+  },
+  fileUploadBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    padding: 10,
   },
   container: {
     display: 'flex',
