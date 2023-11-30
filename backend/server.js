@@ -10,11 +10,16 @@ const { authenticate } = require("ldap-authentication");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const key = fs.readFileSync('./localhost-key.pem', 'utf8');
-const cert = fs.readFileSync('./localhost.pem', 'utf8');
 
+const options = {
+  key: fs.readFileSync('./localhost-key.pem'),
+  cert: fs.readFileSync('./localhost.pem')
+};
 
-https.createServer({ key, cert }, app).listen(3001);
+const httpsServer = https.createServer(options,app);
+httpsServer.listen(3001, () => {
+  console.log('HTTPS server running on port 3001');
+});
 
 app.use(cors()); // For simplicity, allowing all origins
 app.use(express.json()); // To parse JSON request bodies
@@ -290,11 +295,19 @@ app.get("/files/shared", jwtMiddleware, async (req, res) => {
 
 
 app.delete("/delete/:filename", checkRole('delete'), auditMiddleware("delete"), (req, res) => {
-  const homeDir = req.user.homeDirectory; // Extract from user's session or token
-  const filePath = path.join(homeDir, "uploads", req.params.filename);
+  const isShared = req.query.isShared === 'true';
+  let filePath;
+
+  if (isShared) {
+    filePath = path.join(SHARED_DIR, req.params.filename);
+  } else {
+    const homeDir = req.user.homeDirectory;
+    filePath = path.join(homeDir, "uploads", req.params.filename);
+  }
+
   fs.unlink(filePath, (err) => {
     if (err) {
-      console.error("Error deleting file: ", err);
+      console.error("Error deleting file:", err);
       res.status(500).json({ error: "Internal Server Error" });
     } else {
       res.json({ message: "File deleted successfully" });
@@ -302,9 +315,20 @@ app.delete("/delete/:filename", checkRole('delete'), auditMiddleware("delete"), 
   });
 });
 
+
 app.get("/download/:filename", checkRole('download'), auditMiddleware("download"), (req, res) => {
-  const homeDir = req.user.homeDirectory; // Extract from user's session or token
-  const filePath = path.join(homeDir, "uploads", req.params.filename);
+  // Determine the type of file (personal or shared)
+  const isShared = req.query.isShared === 'true'; // Expect a query parameter 'isShared'
+  let filePath;
+
+  if (isShared) {
+    filePath = path.join(SHARED_DIR, req.params.filename);
+  } else {
+    const homeDir = req.user.homeDirectory;
+    filePath = path.join(homeDir, "uploads", req.params.filename);
+  }
+
+  // Send the file for download
   res.download(filePath, (err) => {
     if (err) {
       console.error("Error downloading file:", err);
@@ -313,20 +337,6 @@ app.get("/download/:filename", checkRole('download'), auditMiddleware("download"
   });
 });
 
-// Endpoint to get file content
-app.get("/view/:filename", checkRole('view'), auditMiddleware("view"), async (req, res) => {
-  const { filename } = req.params;
-  const fileDir = activeTab === 'personal' ? req.user.homeDirectory : SHARED_DIR;
-  const filePath = path.join(fileDir, "uploads", filename);
-
-  try {
-    const content = fs.readFileSync(filePath, "utf8");
-    res.json({ content });
-  } catch (error) {
-    console.error("Error reading file:", error);
-    res.status(500).json({ error: "Error reading file" });
-  }
-});
 
 
 app.post("/api/logout", jwtMiddleware, (req, res) => {

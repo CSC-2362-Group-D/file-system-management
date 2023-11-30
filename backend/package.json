@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "ldap.js",
-  "proxy": "http://localhost:3001",
+  "proxy": "https://localhost:3001",
   "scripts": {
     "start": "node server.js",
     "start-frontend": "cd ../frontend && npm start",

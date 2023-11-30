@@ -7,6 +7,8 @@ import { FaDownload, FaTrash, FaEye, FaSignOutAlt  } from 'react-icons/fa';
 //import { useEffect } from 'react';
 import { Tab, Tabs, TabList, TabPanel } from 'react-tabs';
 import 'react-tabs/style/react-tabs.css';
+import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
+
 function Dashboard() {
   // Temporary data for file listings
   const [files, setFiles] = React.useState([]);
@@ -18,6 +20,7 @@ function Dashboard() {
   const [activeTab, setActiveTab] = useState('personal'); // 'personal' or 'shared'
   const [sharedFiles, setSharedFiles] = useState([]);
   const [tabIndex, setTabIndex] = useState(0);
+  const [fileToView, setFileToView] = useState(null);
   useEffect(() => { 
     const token = localStorage.getItem('token');
     if (token) {
@@ -99,8 +102,10 @@ React.useEffect(() => {
   };
 
   const handleFileDownload = (fileName) => {
+    const isShared = tabIndex == 1; // true for shared files, false for personal files
+ 
     axios({
-      url: `https://localhost:3001/download/${fileName}`,
+      url: `https://localhost:3001/download/${fileName}?isShared=${isShared}`,
       method: 'GET',
       responseType: 'blob', // Important
       headers: {
@@ -121,8 +126,11 @@ React.useEffect(() => {
     });
   };
   
+  
   const handleFileDelete = (fileName) => {
-    axios.delete(`https://localhost:3001/delete/${fileName}`, {
+    const isShared = tabIndex == 1;
+   
+    axios.delete(`https://localhost:3001/delete/${fileName}?isShared=${isShared}`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token')}`
       }
@@ -131,29 +139,20 @@ React.useEffect(() => {
       console.log('File deleted successfully');
       // Refresh file list or notify user
       setFiles(files.filter(file => file.name !== fileName)); 
+      refreshFileList();
     })
     .catch(error => {
       console.error('Error deleting file:', error);
     });
   };
 
-  const handleFileView = (fileName) => {
-    axios.get(`https://localhost:3001/view/${fileName}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
-      }
-    })
-    .then(response => {
-      setViewingFileContent(response.data.content);
-      setIsModalOpen(true);
-    })
-    .catch(error => {
-      console.error('Error viewing file:', error);
-    });
-  };
+  
 
   React.useEffect(() => {
-    axios.get('https://localhost:3001/files', {
+    // Determine the correct endpoint based on the user's roles or selection
+    const endpoint = (userRoles.includes('view')) ? 'https://localhost:3001/files/shared' : 'https://localhost:3001/files/personal';
+  
+    axios.get(endpoint, {
       headers: {
         'Authorization': 'Bearer ' + localStorage.getItem('token')
       }
@@ -164,7 +163,7 @@ React.useEffect(() => {
     .catch(error => {
       console.error('Error fetching files:', error);
     });
-  }, []);
+  }, [userRoles]);
   
 
   return (
@@ -179,16 +178,6 @@ React.useEffect(() => {
     <div style={styles.container}>
       
         <h1 style={styles.title}>File Management Dashboard</h1>
-   
-        {isModalOpen && (
-          <div style={styles.modal}>
-            <div style={styles.modalContent}>
-              <h2>File Content</h2>
-              <pre style={styles.fileContent}>{viewingFileContent}</pre>
-              <button onClick={() => setIsModalOpen(false)}>Close</button>
-            </div>
-          </div>
-        )}
 
         
      
@@ -201,12 +190,12 @@ React.useEffect(() => {
 
         <TabPanel>
        
-        {(tabIndex === 1  && userRoles.includes('upload')) || (tabIndex === 0) && (
+     
           <div style={styles.fileUploadBar}>
           <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
           <button onClick={handleFileUpload} style={styles.submitButton}>Upload File</button>
           </div>
-        )}
+       
     <table style={styles.table}>
       <thead>
         <tr>
@@ -219,10 +208,6 @@ React.useEffect(() => {
           <tr key={index} style={styles.tableRow}>
             <td style={styles.fileName}>{file.name}</td>
             <td style={styles.iconCell}>
-            <FaEye
-              style={{ ...styles.icon, ...styles.viewIcon }}
-              onClick={() => handleFileView(file.name)}
-            />
               <FaDownload 
                 style={{ ...styles.icon, ...styles.downloadIcon }}
                 onClick={() => handleFileDownload(file.name)}
@@ -240,7 +225,12 @@ React.useEffect(() => {
   
     </TabPanel>
     <TabPanel>
-
+    {(tabIndex === 1  && userRoles.includes('upload')) && (
+          <div style={styles.fileUploadBar}>
+          <input type="file" onChange={handleFileChange} style={styles.uploadInput} />
+          <button onClick={handleFileUpload} style={styles.submitButton}>Upload File</button>
+          </div>
+        )}
     <table style={styles.table}>
       <thead>
         <tr>
@@ -253,10 +243,6 @@ React.useEffect(() => {
           <tr key={index} style={styles.tableRow}>
             <td style={styles.fileName}>{file.name}</td>
             <td style={styles.iconCell}>
-            <FaEye
-              style={{ ...styles.icon, ...styles.viewIcon }}
-              onClick={() => handleFileView(file.name)}
-            />
               {userRoles.includes('download') && (
               <FaDownload 
                 style={{ ...styles.icon, ...styles.downloadIcon }}
@@ -295,6 +281,7 @@ const styles = {
     justifyContent: 'center',
     width: '100%',
     padding: 10,
+    paddingBottom: 0,
   },
   container: {
     display: 'flex',
@@ -305,10 +292,12 @@ const styles = {
   header: {
     display: 'flex',
     justifyContent: 'flex-end',
+    
     padding: 13,
   },
   title: {
     marginBottom: '2rem',
+    textAlign:'center',
     fontSize: '2.5rem',
   },
   form: {
@@ -421,12 +410,14 @@ submitButton: {
     position: 'fixed',
     top: 0,
     left: 0,
+    elevation: 20,
     width: '100%',
     height: '100%',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000, // Set a high z-index value
   },
   modalContent: {
     backgroundColor: '#333',
@@ -473,18 +464,20 @@ submitButton: {
   tabBar: {
     padding: '20px',
     width:'80%',
+   
     flex:1,    
   },tab: {
     color: '#0ff',
-    width: '46%',
+    width:'45%',
     border: 'none',
     padding: '10px',
+    
     cursor: 'pointer',
     backgroundColor: 'transparent',
   },
   activeTab: {
     color: 'black',
-    width: '46%',
+    width:'45%',
     border: 'none',
     backgroundColor: '#0ff',
   }
